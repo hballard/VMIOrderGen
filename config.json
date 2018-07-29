@@ -1,0 +1,12 @@
+{
+  "shiptos": {
+    "MILL": "1",
+    "MNTC": "PTS1",
+    "WHSE": "PTS2",
+    "SNK": "PTS3",
+    "VK": "PTS4",
+    "LAB": "PTS5",
+    "SAFE": "PTS6",
+    "GEN": "PTS7"
+  }
+}
