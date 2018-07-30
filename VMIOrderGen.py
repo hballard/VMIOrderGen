@@ -2,6 +2,8 @@
 
 import json
 import os
+from argparse import Namespace
+from typing import Optional, Dict
 
 from gooey import Gooey, GooeyParser
 import pandas as pd
@@ -15,9 +17,9 @@ OUTPUT_PATH = 'output'
 
 
 @Gooey(program_name='VMI Order Generator', default_size=(810, 530))
-def get_args():
+def get_args() -> Namespace:
     parser = GooeyParser(description='Process VMI counts and'
-                                     ' return quote and OE Upload files')
+                         ' return quote and OE Upload files')
     parser.add_argument(
         '--count_file',
         '-C',
@@ -62,26 +64,29 @@ def get_args():
     return parser.parse_args()
 
 
-def read_config_file(config_file):
+def read_config_file(
+        config_file_path: str) -> Optional[Dict[str, Dict[str, str]]]:
     try:
-        with open(config_file) as f:
+        with open(config_file_path) as f:
             config = json.load(f)
+            return config
     except FileNotFoundError:
-        config = None
+        return None
     except json.decoder.JSONDecodeError:
         print("Error in config file; please correct and re-run")
-        return
-    return config
+        return None
 
 
-def make_output_dir(path):
+def make_output_dir(path: str) -> None:
     try:
         os.makedirs(path)
     except FileExistsError:
         return
 
 
-def process_counts(count_file, backorder_file, config):
+def process_counts(count_file: str, backorder_file: str,
+                   config: Optional[Dict[str, Dict[str, str]]]) -> pd.DataFrame:
+
     input_count = pd.read_excel(count_file)
 
     input_count['bin'], input_count['shipto'], input_count[
@@ -102,12 +107,12 @@ def process_counts(count_file, backorder_file, config):
     return orders
 
 
-def write_quote_template(orders, quote_file_path):
+def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
     with pd.ExcelWriter(quote_file_path, engine='xlsxwriter') as writer:
         orders.to_excel(writer)
 
 
-def write_oe_template(orders, oe_file):
+def write_oe_template(orders: pd.DataFrame, oe_file_path: str) -> None:
     pass
 
 
