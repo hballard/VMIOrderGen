@@ -108,12 +108,12 @@ def process_counts(count_file: str, backorder_file: str,
 
 
 def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
-    with pd.ExcelWriter(quote_file_path, engine='xlsxwriter') as writer:
-        orders.to_excel(writer)
+    pass
 
 
 def write_oe_template(orders: pd.DataFrame, oe_file_path: str) -> None:
-    pass
+    with pd.ExcelWriter(oe_file_path, engine='xlsxwriter') as writer:
+        orders.to_excel(writer)
 
 
 if __name__ == "__main__":
@@ -126,5 +126,5 @@ if __name__ == "__main__":
 
     # Write out quote and / or OE upload template
     make_output_dir(args.output_path)
-    quote_file_path = f'{args.output_path}/{args.OEUpload_name}'
-    write_quote_template(orders, quote_file_path)
+    oe_file_path = f'{args.output_path}/{args.OEUpload_name}'
+    write_oe_template(orders, oe_file_path)
