@@ -21,20 +21,17 @@ def get_args() -> Namespace:
     parser = GooeyParser(description='Process VMI counts and'
                          ' return quote and OE Upload files')
     parser.add_argument(
-        '--count_file',
-        '-C',
+        'count_file',
         default=INPUT_COUNT_FILE,
         widget="FileChooser",
         help='Provide a path to a count file to import')
     parser.add_argument(
-        '--backorder_file',
-        '-B',
+        'backorder_file',
         default=INPUT_BACKORDER_FILE,
         widget="FileChooser",
         help='Provide a path to a backorder file to import')
     parser.add_argument(
         '--config',
-        '-c',
         dest='config_file',
         default=CONFIG_FILE,
         widget="FileChooser",
@@ -84,9 +81,11 @@ def make_output_dir(path: str) -> None:
         return
 
 
-def process_counts(count_file: str, backorder_file: str,
-                   config: Optional[Dict[str, Dict[str, str]]]) -> pd.DataFrame:
+def process_counts(
+        count_file: str, backorder_file: str,
+        config: Optional[Dict[str, Dict[str, str]]]) -> pd.DataFrame:
 
+    # Read in count file to dataframe
     input_count = pd.read_excel(count_file)
 
     input_count['bin'], input_count['shipto'], input_count[
@@ -96,14 +95,15 @@ def process_counts(count_file: str, backorder_file: str,
         input_count.replace(
             to_replace={'shipto': config['shiptos']}, value=None, inplace=True)
 
+    # Read in backorder file to dataframe
     input_backorder = pd.read_excel(backorder_file)[[
         'prod', 'shipto', 'backorder'
     ]].copy()
 
     orders = input_count.merge(
         input_backorder, on=['prod', 'shipto'], how='left')
-
     orders['order_amt'] = orders['qty'] - orders['backorder']
+
     return orders
 
 
