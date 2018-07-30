@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-import argparse
 import json
 import os
 
+from gooey import Gooey, GooeyParser
 import pandas as pd
 
 CONFIG_FILE = './config.json'
@@ -20,36 +20,40 @@ def make_output_dir():
         return
 
 
+@Gooey(program_name='VMI Order Generator', default_size=(810, 530))
 def get_args():
-    parser = argparse.ArgumentParser(description='Process VMI counts and'
+    parser = GooeyParser(description='Process VMI counts and'
                                      ' return quote and OE Upload files')
     parser.add_argument(
         '--count_file',
         '-C',
         default=INPUT_COUNTS,
+        widget="FileChooser",
         help='Provide a path to a count file to import')
     parser.add_argument(
         '--backorder_file',
         '-B',
         default=INPUT_BACKORDERS,
+        widget="FileChooser",
         help='Provide a path to a backorder file to import')
     parser.add_argument(
         '--quote',
         '-Q',
         dest='quote_path',
         default=OUTPUT_QUOTE,
-        help='Provide a file path to ouput Excel quotation file')
+        help='Provide a file path to output Excel quotation file')
     parser.add_argument(
         '--OEUpload',
         '-O',
         dest='OEUpload_path',
         default=OUTPUT_OE_UPLOAD,
-        help='Provide a file path for Excel OE upload template file')
+        help='Provide a file path to output Excel OE upload template file')
     parser.add_argument(
         '--config',
         '-c',
         dest='config_file',
         default=CONFIG_FILE,
+        widget="FileChooser",
         help='Provide a config file if desired in JSON; see'
         ' example; can be used for remapping "shipto" names for example')
 
