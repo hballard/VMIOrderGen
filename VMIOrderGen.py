@@ -7,10 +7,10 @@ from gooey import Gooey, GooeyParser
 import pandas as pd
 
 CONFIG_FILE = 'config.json'
-INPUT_COUNTS = 'counts.xlsx'
-INPUT_BACKORDERS = 'backorders.xlsx'
-OUTPUT_QUOTE = 'quote.xlsx'
-OUTPUT_OE_UPLOAD = 'oe_upload.xlsx'
+INPUT_COUNT_FILE = 'counts.xlsx'
+INPUT_BACKORDER_FILE = 'backorders.xlsx'
+OUTPUT_QUOTE_FILE = 'quote.xlsx'
+OUTPUT_OEUPLOAD_FILE = 'oe_upload.xlsx'
 OUTPUT_PATH = 'output'
 
 
@@ -21,13 +21,13 @@ def get_args():
     parser.add_argument(
         '--count_file',
         '-C',
-        default=INPUT_COUNTS,
+        default=INPUT_COUNT_FILE,
         widget="FileChooser",
         help='Provide a path to a count file to import')
     parser.add_argument(
         '--backorder_file',
         '-B',
-        default=INPUT_BACKORDERS,
+        default=INPUT_BACKORDER_FILE,
         widget="FileChooser",
         help='Provide a path to a backorder file to import')
     parser.add_argument(
@@ -49,13 +49,13 @@ def get_args():
         '--quote',
         '-Q',
         dest='quote_name',
-        default=OUTPUT_QUOTE,
+        default=OUTPUT_QUOTE_FILE,
         help='Provide a filename for output of Excel quotation file')
     parser.add_argument(
         '--OEUpload',
         '-O',
         dest='OEUpload_name',
-        default=OUTPUT_OE_UPLOAD,
+        default=OUTPUT_OEUPLOAD_FILE,
         help='Provide a filename for output of Excel OE upload template file')
 
     return parser.parse_args()
@@ -75,7 +75,7 @@ def read_config_file(config_file):
 
 def make_output_dir(path):
     try:
-        os.mkdir(path)
+        os.mkdirs(path)
     except FileExistsError:
         return
 
