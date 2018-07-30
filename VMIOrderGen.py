@@ -37,7 +37,8 @@ def get_args():
         default=CONFIG_FILE,
         widget="FileChooser",
         help='Provide a config file if desired in JSON format; see'
-        ' example; can be used for remapping "shipto" names for example')
+        #  ' example; can be used for remapping "shipto" names for example')
+        ' example')
     parser.add_argument(
         '--path',
         '-P',
@@ -75,7 +76,7 @@ def read_config_file(config_file):
 
 def make_output_dir(path):
     try:
-        os.mkdirs(path)
+        os.makedirs(path)
     except FileExistsError:
         return
 
