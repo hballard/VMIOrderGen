@@ -6,18 +6,12 @@ import os
 from gooey import Gooey, GooeyParser
 import pandas as pd
 
-CONFIG_FILE = './config.json'
-INPUT_COUNTS = './counts.xlsx'
-INPUT_BACKORDERS = './backorders.xlsx'
-OUTPUT_QUOTE = './output/quote.xlsx'
-OUTPUT_OE_UPLOAD = './output/oe_upload.xlsx'
-
-
-def make_output_dir():
-    try:
-        os.mkdir('./output')
-    except FileExistsError:
-        return
+CONFIG_FILE = 'config.json'
+INPUT_COUNTS = 'counts.xlsx'
+INPUT_BACKORDERS = 'backorders.xlsx'
+OUTPUT_QUOTE = 'quote.xlsx'
+OUTPUT_OE_UPLOAD = 'oe_upload.xlsx'
+OUTPUT_PATH = 'output'
 
 
 @Gooey(program_name='VMI Order Generator', default_size=(810, 530))
@@ -37,25 +31,32 @@ def get_args():
         widget="FileChooser",
         help='Provide a path to a backorder file to import')
     parser.add_argument(
-        '--quote',
-        '-Q',
-        dest='quote_path',
-        default=OUTPUT_QUOTE,
-        help='Provide a file path to output Excel quotation file')
-    parser.add_argument(
-        '--OEUpload',
-        '-O',
-        dest='OEUpload_path',
-        default=OUTPUT_OE_UPLOAD,
-        help='Provide a file path to output Excel OE upload template file')
-    parser.add_argument(
         '--config',
         '-c',
         dest='config_file',
         default=CONFIG_FILE,
         widget="FileChooser",
-        help='Provide a config file if desired in JSON; see'
+        help='Provide a config file if desired in JSON format; see'
         ' example; can be used for remapping "shipto" names for example')
+    parser.add_argument(
+        '--path',
+        '-P',
+        dest='output_path',
+        default=OUTPUT_PATH,
+        widget="DirChooser",
+        help='Provide a path for the ouput files')
+    parser.add_argument(
+        '--quote',
+        '-Q',
+        dest='quote_name',
+        default=OUTPUT_QUOTE,
+        help='Provide a filename for output of Excel quotation file')
+    parser.add_argument(
+        '--OEUpload',
+        '-O',
+        dest='OEUpload_name',
+        default=OUTPUT_OE_UPLOAD,
+        help='Provide a filename for output of Excel OE upload template file')
 
     return parser.parse_args()
 
@@ -70,6 +71,13 @@ def read_config_file(config_file):
         print("Error in config file; please correct and re-run")
         return
     return config
+
+
+def make_output_dir(path):
+    try:
+        os.mkdir(path)
+    except FileExistsError:
+        return
 
 
 def process_counts(count_file, backorder_file, config):
@@ -93,8 +101,8 @@ def process_counts(count_file, backorder_file, config):
     return orders
 
 
-def write_quote_template(orders, quote_file):
-    with pd.ExcelWriter(quote_file, engine='xlsxwriter') as writer:
+def write_quote_template(orders, quote_file_path):
+    with pd.ExcelWriter(quote_file_path, engine='xlsxwriter') as writer:
         orders.to_excel(writer)
 
 
@@ -111,5 +119,6 @@ if __name__ == "__main__":
     orders = process_counts(args.count_file, args.backorder_file, config)
 
     # Write out quote and / or OE upload template
-    make_output_dir()
-    write_quote_template(orders, args.OEUpload_path)
+    make_output_dir(args.output_path)
+    quote_file_path = f'{args.output_path}/{args.OEUpload_name}'
+    write_quote_template(orders, quote_file_path)
