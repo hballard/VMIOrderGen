@@ -5,8 +5,8 @@ import os
 from argparse import Namespace
 from typing import Optional, Dict
 
-from gooey import Gooey, GooeyParser
 import pandas as pd
+from gooey import Gooey, GooeyParser
 
 CONFIG_FILE = 'config.json'
 INPUT_COUNT_FILE = 'counts.xlsx'
@@ -36,7 +36,6 @@ def get_args() -> Namespace:
         default=CONFIG_FILE,
         widget="FileChooser",
         help='Provide a config file if desired in JSON format; see'
-        #  ' example; can be used for remapping "shipto" names for example')
         ' example')
     parser.add_argument(
         '--path',
@@ -85,6 +84,7 @@ def process_counts(
         count_file: str, backorder_file: str,
         config: Optional[Dict[str, Dict[str, str]]]) -> pd.DataFrame:
 
+    # TODO: add try / except and include CSV as an option
     # Read in count file to dataframe
     input_count = pd.read_excel(count_file)
 
@@ -95,6 +95,7 @@ def process_counts(
         input_count.replace(
             to_replace={'shipto': config['shiptos']}, value=None, inplace=True)
 
+    # TODO: add try / except and include CSV as an option
     # Read in backorder file to dataframe
     input_backorder = pd.read_excel(backorder_file)[[
         'prod', 'shipto', 'backorder'
@@ -113,7 +114,9 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
 
 def write_oe_template(orders: pd.DataFrame, oe_file_path: str) -> None:
     with pd.ExcelWriter(oe_file_path, engine='xlsxwriter') as writer:
-        orders.to_excel(writer)
+        for i in orders.shipto.unique():
+            _orders = orders[orders['shipto'] == i]
+            _orders.to_excel(writer, sheet_name=f'{i}')
 
 
 if __name__ == "__main__":
