@@ -10,8 +10,6 @@ numpy = "==1.14.5"
 gooey = "*"
 
 [dev-packages]
-neovim = "*"
-xlrd = "*"
 yapf = "*"
 "flake8" = "*"
 mypy = "*"
