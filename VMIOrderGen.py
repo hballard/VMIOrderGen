@@ -9,11 +9,11 @@ from gooey import Gooey, GooeyParser
 
 CONFIG_FILE = 'config.json'
 DATA_FILE = 'product_data.csv'
-INPUT_COUNT_FILE = 'counts.xlsx'
-INPUT_BACKORDER_FILE = 'backorders.xlsx'
+INPUT_COUNT_FILE = ''
+INPUT_BACKORDER_FILE = ''
 OUTPUT_QUOTE_FILE = 'quote.xlsx'
 OUTPUT_OEUPLOAD_FILE = 'oe_upload.xlsx'
-OUTPUT_PATH = 'output'
+OUTPUT_PATH = os.path.expanduser('~/Desktop')
 
 
 @Gooey(program_name='VMI Order Generator', default_size=(810, 600))
@@ -96,11 +96,11 @@ def process_counts(count_file: str, backorder_file: str,
     input_count['bin'], input_count['shipto'], input_count[
         'prod'] = input_count['Barcode'].str.split('-', 2).str
 
+    input_count['prod'] = input_count['prod'].str.rstrip()
+
     if config:
         input_count.replace(
             to_replace={'shipto': config['shiptos']}, value=None, inplace=True)
-
-    # Add product description and price
 
     # TODO: add try / except and include CSV as an option
     # Read in backorder file to dataframe
@@ -111,13 +111,21 @@ def process_counts(count_file: str, backorder_file: str,
     orders = input_count.merge(
         input_backorder, on=['prod', 'shipto'], how='left')
     orders.fillna(0, inplace=True)
-    orders['order_amt'] = orders['Count Qty'] - orders['backorder']
+    orders['order_amt'] = orders.apply(
+        lambda x: x['Count Qty'] - x['backorder'] if x['Count Qty'] >= x['backorder'] else 0,
+        axis=1)
 
+    # TODO: add try / except and include Excel as an option
     # Add product description and price
     product_descriptions = pd.read_csv(product_data_file)
 
     orders_with_descr = orders.merge(
-        product_descriptions, on='prod', how='left')
+        product_descriptions, on=['prod'], how='left')
+
+    orders_with_descr['price'] = orders_with_descr['price'].replace(
+        '[\$,]', '', regex=True).astype(float)
+
+    orders_with_descr['total price'] = orders_with_descr['price'] * orders_with_descr['order_amt']
 
     return orders_with_descr
 
@@ -126,8 +134,41 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
                          config) -> None:
     with pd.ExcelWriter(quote_file_path, engine='xlsxwriter') as writer:
         for i in orders.shipto.unique():
-            _orders = orders[orders['shipto'] == i]
-            _orders.to_excel(writer, sheet_name=f'{i}', index=False)
+            orders_by_shipto = orders[orders['shipto'] == i]
+            orders_by_shipto.to_excel(
+                writer, sheet_name=f'{i}', startrow=1, index=False)
+
+            # Get workbook and worksheet objects
+            workbook = writer.book
+            worksheet = writer.sheets[i]
+
+            # Specify column widths
+            worksheet.set_column('A:A', 28)
+            worksheet.set_column('D:D', 12)
+            worksheet.set_column('H:H', 19)
+            worksheet.set_column('K:K', 50)
+
+            # Specify price format
+            price_format = workbook.add_format()
+            price_format.set_num_format(0x08)
+            worksheet.set_column('L:L', None, price_format)
+            worksheet.set_column('M:M', None, price_format)
+
+            # Set logo
+            worksheet.set_row(0, 43)
+            worksheet.insert_image(
+                0, 0, os.path.join(os.getcwd(), 'logos', 'PSSI Horz Logo.png'))
+
+            # Label worksheet tab
+            merge_format = workbook.add_format({
+                'bold': True,
+                'font_size': 28,
+                'font_color': 'red',
+                'align': 'center',
+                'valign': 'vcenter'
+            })
+
+            worksheet.merge_range('F1:J1', 'Quote', merge_format)
 
 
 def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
@@ -135,8 +176,8 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
         for i in orders.shipto.unique():
 
             # write orders data
-            _orders = orders[orders['shipto'] == i]
-            _orders.to_excel(
+            orders_by_shipto = orders[orders['shipto'] == i]
+            orders_by_shipto.to_excel(
                 writer,
                 sheet_name=f'{i}',
                 columns=['prod'],
@@ -144,15 +185,7 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
                 index=False,
                 startrow=8,
                 startcol=0)
-            _orders.to_excel(
-                writer,
-                sheet_name=f'{i}',
-                columns=['description'],
-                header=False,
-                index=False,
-                startrow=8,
-                startcol=1)
-            _orders.to_excel(
+            orders_by_shipto.to_excel(
                 writer,
                 sheet_name=f'{i}',
                 columns=['order_amt'],
@@ -162,7 +195,6 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
                 startcol=2)
 
             # write oe upload template headers
-            # workbook = writer.book
             worksheet = writer.sheets[i]
             worksheet.write('A1', config.get('customerNo'))
             worksheet.write('A2', config.get('warehouse'))

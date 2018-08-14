@@ -1,7 +1,7 @@
 {
   "customerNo": "10008088",
   "warehouse": "100P",
-  "shipVia": "insert ship via code",
+  "shipVia": "91A0",
   "shiptos": {
     "MILL": "1",
     "MNTC": "PTS1",
