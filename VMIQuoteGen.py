@@ -16,7 +16,7 @@ OUTPUT_OEUPLOAD_FILE = 'oe_upload.xlsx'
 OUTPUT_PATH = os.path.expanduser('~/Desktop')
 
 
-@Gooey(program_name='VMI Order Generator', default_size=(810, 600))
+@Gooey(program_name='VMI Quote Generator', default_size=(810, 600))
 def get_args() -> Namespace:
     parser = GooeyParser(description='Process VMI counts and'
                          ' return quote and OE Upload files')
@@ -125,7 +125,8 @@ def process_counts(count_file: str, backorder_file: str,
     orders_with_descr['price'] = orders_with_descr['price'].replace(
         '[\$,]', '', regex=True).astype(float)
 
-    orders_with_descr['total price'] = orders_with_descr['price'] * orders_with_descr['order_amt']
+    orders_with_descr['total price'] = (
+        orders_with_descr['price'] * orders_with_descr['order_amt'])
 
     return orders_with_descr
 
@@ -134,6 +135,7 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
                          config) -> None:
     with pd.ExcelWriter(quote_file_path, engine='xlsxwriter') as writer:
         for i in orders.shipto.unique():
+            # Filter orders dataframe by shipto
             orders_by_shipto = orders[orders['shipto'] == i]
             orders_by_shipto.to_excel(
                 writer, sheet_name=f'{i}', startrow=1, index=False)
@@ -148,18 +150,18 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
             worksheet.set_column('H:H', 19)
             worksheet.set_column('K:K', 50)
 
-            # Specify price format
+            # Specify price column format
             price_format = workbook.add_format()
             price_format.set_num_format(0x08)
             worksheet.set_column('L:L', None, price_format)
             worksheet.set_column('M:M', None, price_format)
 
-            # Set logo
+            # Set logo on each tab
             worksheet.set_row(0, 43)
             worksheet.insert_image(
                 0, 0, os.path.join(os.getcwd(), 'logos', 'PSSI Horz Logo.png'))
 
-            # Label worksheet tab
+            # Add title to worksheet tab
             merge_format = workbook.add_format({
                 'bold': True,
                 'font_size': 28,

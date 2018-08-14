@@ -8,6 +8,7 @@ pandas = "*"
 xlsxwriter = "*"
 numpy = "==1.14.5"
 gooey = "*"
+xlrd = "*"
 
 [dev-packages]
 yapf = "*"
