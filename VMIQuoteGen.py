@@ -11,8 +11,8 @@ CONFIG_FILE = 'config.json'
 DATA_FILE = 'product_data.csv'
 INPUT_COUNT_FILE = ''
 INPUT_BACKORDER_FILE = ''
-OUTPUT_QUOTE_FILE = 'quote.xlsx'
-OUTPUT_OEUPLOAD_FILE = 'oe_upload.xlsx'
+OUTPUT_QUOTE_FILE = 'quote'
+OUTPUT_OEUPLOAD_FILE = 'oe_upload'
 OUTPUT_PATH = os.path.expanduser('~/Desktop')
 
 
@@ -35,15 +35,13 @@ def get_args() -> Namespace:
         dest='config_file',
         default=CONFIG_FILE,
         widget="FileChooser",
-        help='Provide a config file if desired in JSON format; see'
-        ' example')
+        help='Provide a config file in JSON format; see example')
     parser.add_argument(
         '--product_data',
         dest='product_data_file',
         default=DATA_FILE,
         widget="FileChooser",
-        help='Provide a product data file if desired in CSV format;'
-        ' will be used for product descriptions and price')
+        help='Provide a product data file in CSV format; see example')
     parser.add_argument(
         '--quote',
         '-Q',
@@ -98,6 +96,8 @@ def process_counts(count_file: str, backorder_file: str,
 
     input_count['prod'] = input_count['prod'].str.rstrip()
 
+    input_count['shipto_alias'] = input_count['shipto']
+
     if config:
         input_count.replace(
             to_replace={'shipto': config['shiptos']}, value=None, inplace=True)
@@ -133,28 +133,32 @@ def process_counts(count_file: str, backorder_file: str,
 
 def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
                          config) -> None:
-    with pd.ExcelWriter(quote_file_path, engine='xlsxwriter') as writer:
-        for i in orders.shipto.unique():
-            # Filter orders dataframe by shipto
-            orders_by_shipto = orders[orders['shipto'] == i]
+    for shipto_alias in orders.shipto_alias.unique():
+        with pd.ExcelWriter(
+                f'{quote_file_path}_{shipto_alias}.xlsx',
+                engine='xlsxwriter') as writer:
+
+            # Filter orders dataframe by shipto_alias
+            orders_by_shipto = orders[orders['shipto_alias'] == shipto_alias]
             orders_by_shipto.to_excel(
-                writer, sheet_name=f'{i}', startrow=1, index=False)
+                writer, sheet_name=f'{shipto_alias}', startrow=1, index=False)
 
             # Get workbook and worksheet objects
             workbook = writer.book
-            worksheet = writer.sheets[i]
+            worksheet = writer.sheets[shipto_alias]
 
             # Specify column widths
             worksheet.set_column('A:A', 28)
             worksheet.set_column('D:D', 12)
             worksheet.set_column('H:H', 19)
-            worksheet.set_column('K:K', 50)
+            worksheet.set_column('I:I', 12)
+            worksheet.set_column('L:L', 50)
 
             # Specify price column format
             price_format = workbook.add_format()
             price_format.set_num_format(0x08)
-            worksheet.set_column('L:L', None, price_format)
-            worksheet.set_column('M:M', None, price_format)
+            worksheet.set_column('M:M', 13, price_format)
+            worksheet.set_column('N:N', 11, price_format)
 
             # Set logo on each tab
             worksheet.set_row(0, 43)
@@ -170,18 +174,29 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
                 'valign': 'vcenter'
             })
 
+            total_price_format = workbook.add_format({
+                'bold': True,
+                'font_size': 14,
+                'font_color': 'red',
+            })
+            total_price_format.set_num_format(0x08)
+
             worksheet.merge_range('F1:J1', 'Quote', merge_format)
+            worksheet.write('M1', 'Total Price', total_price_format)
+            worksheet.write_formula(
+                'N1', f'=sum(N3:N{2+len(orders_by_shipto.index)})',
+                total_price_format)
 
 
 def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
-    with pd.ExcelWriter(oe_file_path, engine='xlsxwriter') as writer:
-        for i in orders.shipto.unique():
+    with pd.ExcelWriter(f'{oe_file_path}.xlsx', engine='xlsxwriter') as writer:
+        for shipto in orders.shipto.unique():
 
             # write orders data
-            orders_by_shipto = orders[orders['shipto'] == i]
+            orders_by_shipto = orders[orders['shipto'] == shipto]
             orders_by_shipto.to_excel(
                 writer,
-                sheet_name=f'{i}',
+                sheet_name=f'{shipto}',
                 columns=['prod'],
                 header=False,
                 index=False,
@@ -189,7 +204,7 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
                 startcol=0)
             orders_by_shipto.to_excel(
                 writer,
-                sheet_name=f'{i}',
+                sheet_name=f'{shipto}',
                 columns=['order_amt'],
                 header=False,
                 index=False,
@@ -197,12 +212,12 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
                 startcol=2)
 
             # write oe upload template headers
-            worksheet = writer.sheets[i]
+            worksheet = writer.sheets[shipto]
             worksheet.write('A1', config.get('customerNo'))
             worksheet.write('A2', config.get('warehouse'))
-            worksheet.write('A3', config.get('PO')[i])
+            worksheet.write('A3', config.get('PO')[shipto])
             worksheet.write('A4', config.get('shipVia'))
-            worksheet.write('B1', i)
+            worksheet.write('B1', shipto)
             worksheet.write('B2', 'QU')
 
             # write data headers for product rows
