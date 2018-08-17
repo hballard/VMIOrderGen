@@ -7,13 +7,13 @@ from argparse import Namespace
 import pandas as pd
 from gooey import Gooey, GooeyParser
 
-CONFIG_FILE = 'config.json'
-DATA_FILE = 'product_data.csv'
 INPUT_COUNT_FILE = ''
 INPUT_BACKORDER_FILE = ''
 OUTPUT_QUOTE_FILE = 'quote'
 OUTPUT_OEUPLOAD_FILE = 'oe_upload'
 OUTPUT_PATH = os.path.expanduser('~/Desktop')
+CONFIG_FILE = 'config.json'
+DATA_FILE = 'product_data.csv'
 
 
 @Gooey(program_name='VMI Quote Generator', default_size=(810, 600))
@@ -87,8 +87,9 @@ def make_output_dir(path: str) -> None:
 def process_counts(count_file: str, backorder_file: str,
                    product_data_file: str, config) -> pd.DataFrame:
 
-    # TODO: add try / except and include CSV as an option
-    # Read in count file to dataframe
+    # TODO: add try / except and include CSV as an option; include handling for
+    # poorly formed data and incorrect headers
+    # Read in count file to dataframe, format and add "ship_alias" column
     input_count = pd.read_excel(count_file)
 
     input_count['bin'], input_count['shipto'], input_count[
@@ -103,7 +104,9 @@ def process_counts(count_file: str, backorder_file: str,
             to_replace={'shipto': config['shiptos']}, value=None, inplace=True)
 
     # TODO: add try / except and include CSV as an option
-    # Read in backorder file to dataframe
+    # TODO: modify to accept daily backorder file
+    # Read in backorder file to dataframe, merge with counts dataframe, fill
+    # NAs, and add "order_amt" column
     input_backorder = pd.read_excel(backorder_file)[[
         'prod', 'shipto', 'backorder'
     ]].copy()
@@ -112,15 +115,17 @@ def process_counts(count_file: str, backorder_file: str,
         input_backorder, on=['prod', 'shipto'], how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
-        lambda x: x['Count Qty'] - x['backorder'] if x['Count Qty'] >= x['backorder'] else 0,
+        lambda x: (x['Count Qty'] - x['backorder'] if x['Count Qty'] >=
+                   x['backorder'] else 0),
         axis=1)
 
     # TODO: add try / except and include Excel as an option
-    # Add product description and price
-    product_descriptions = pd.read_csv(product_data_file)
+    # Read product data file, merge with orders dataframe, format price
+    # field and add "total price" field
+    product_data = pd.read_csv(product_data_file)
 
     orders_with_descr = orders.merge(
-        product_descriptions, on=['prod'], how='left')
+        product_data, on=['prod'], how='left')
 
     orders_with_descr['price'] = orders_with_descr['price'].replace(
         '[\$,]', '', regex=True).astype(float)
@@ -135,7 +140,7 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
                          config) -> None:
     for shipto_alias in orders.shipto_alias.unique():
         with pd.ExcelWriter(
-                f'{quote_file_path}_{shipto_alias}.xlsx',
+                f'{quote_file_path}-{shipto_alias}.xlsx',
                 engine='xlsxwriter') as writer:
 
             # Filter orders dataframe by shipto_alias
@@ -181,6 +186,7 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
             })
             total_price_format.set_num_format(0x08)
 
+            # add Total Price Excel "sum" function to header
             worksheet.merge_range('F1:J1', 'Quote', merge_format)
             worksheet.write('M1', 'Total Price', total_price_format)
             worksheet.write_formula(
@@ -236,19 +242,20 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
 
 
 if __name__ == "__main__":
+
     # Get args and configs
     args = get_args()
     config = read_config_file(args.config_file)
 
-    # Process orders using count and backorders
+    # Process orders using VMI count and current SXe backorders
     orders = process_counts(args.count_file, args.backorder_file,
                             args.product_data_file, config)
 
-    # Write out OE upload template
+    # Write out OE upload template file (one tab for each shipto)
     make_output_dir(args.output_path)
     oe_file_path = os.path.join(args.output_path, args.OEUpload_name)
     write_oe_template(orders, oe_file_path, config)
 
-    # Write out quote
+    # Write out quote files (one file for each shipto)
     quote_file_path = os.path.join(args.output_path, args.quote_name)
     write_quote_template(orders, quote_file_path, config)
