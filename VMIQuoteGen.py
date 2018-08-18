@@ -87,6 +87,7 @@ def make_output_dir(path: str) -> None:
 def process_counts(count_file: str, backorder_file: str,
                    product_data_file: str, config) -> pd.DataFrame:
 
+    # TODO: figure out why the script is duplicating rows in some cases
     # TODO: add try / except and include CSV as an option; include handling for
     # poorly formed data and incorrect headers
     # Read in count file to dataframe, format and add "ship_alias" column
