@@ -91,10 +91,12 @@ def process_counts(count_file: str, backorder_file: str,
     # TODO: add try / except and include CSV as an option; include handling for
     # poorly formed data and incorrect headers
     # Read in count file to dataframe, format and add "ship_alias" column
-    input_count = pd.read_excel(count_file)
+    input_count = pd.read_excel(
+        count_file,
+        names=['barcode', 'count', 'new_prod', 'additional_qty', 'comments'])
 
     input_count['bin'], input_count['shipto'], input_count[
-        'prod'] = input_count['Barcode'].str.split('-', 2).str
+        'prod'] = input_count['barcode'].str.split('-', 2).str
 
     input_count['prod'] = input_count['prod'].str.rstrip()
 
@@ -108,31 +110,41 @@ def process_counts(count_file: str, backorder_file: str,
     # TODO: modify to accept daily backorder file
     # Read in backorder file to dataframe, merge with counts dataframe, fill
     # NAs, and add "order_amt" column
-    input_backorder = pd.read_excel(backorder_file)[[
-        'prod', 'shipto', 'backorder'
-    ]].copy()
+    input_backorder = pd.read_excel(
+        backorder_file, usecols='A,E,K', names=['prod', 'backorder', 'shipto'])
+    input_backorder = input_backorder.groupby(['prod',
+                                               'shipto']).sum().reset_index()
 
     orders = input_count.merge(
         input_backorder, on=['prod', 'shipto'], how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
-        lambda x: (x['Count Qty'] - x['backorder'] if x['Count Qty'] >=
-                   x['backorder'] else 0),
+        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder'] else 0),
         axis=1)
+
+    orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
     # TODO: add try / except and include Excel as an option
     # Read product data file, merge with orders dataframe, format price
-    # field and add "total price" field
-    product_data = pd.read_csv(product_data_file)
+    # field and add "total_price" field
+    product_data = pd.read_csv(
+        product_data_file, names=['prod', 'description', 'price'])
 
-    orders_with_descr = orders.merge(
-        product_data, on=['prod'], how='left')
+    orders_with_descr = orders.merge(product_data, on=['prod'], how='left')
 
     orders_with_descr['price'] = orders_with_descr['price'].replace(
         '[\$,]', '', regex=True).astype(float)
 
-    orders_with_descr['total price'] = (
+    orders_with_descr['total_price'] = (
         orders_with_descr['price'] * orders_with_descr['order_amt'])
+
+    # Re-arrange column order
+    new_column_order = [
+        'barcode', 'count', 'new_prod', 'additional_qty', 'comments', 'bin',
+        'shipto', 'shipto_alias', 'prod', 'description', 'backorder',
+        'order_amt', 'price', 'total_price'
+    ]
+    orders_with_descr = orders_with_descr[new_column_order]
 
     return orders_with_descr
 
@@ -144,21 +156,42 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
                 f'{quote_file_path}-{shipto_alias}.xlsx',
                 engine='xlsxwriter') as writer:
 
-            # Filter orders dataframe by shipto_alias
+            # Filter orders dataframe by shipto_alias and print data
             orders_by_shipto = orders[orders['shipto_alias'] == shipto_alias]
+            print_columns = [
+                'bin', 'shipto', 'shipto_alias', 'prod', 'description',
+                'new_prod', 'count', 'additional_qty', 'backorder',
+                'order_amt', 'price', 'total_price'
+            ]
+            print_headers = [
+                'Bin', 'Shipto', 'Shipto Alias', 'Prod', 'Description',
+                'New Prod', 'Count', 'Additional Qty', 'Backorder',
+                'Order Amt', 'Unit Price', 'Total Price'
+            ]
             orders_by_shipto.to_excel(
-                writer, sheet_name=f'{shipto_alias}', startrow=1, index=False)
+                writer,
+                sheet_name=f'{shipto_alias}',
+                columns=print_columns,
+                header=print_headers,
+                startrow=1,
+                index=False)
 
-            # Get workbook and worksheet objects
+            # Get workbook and worksheet objects; format worksheet print
+            # properties
             workbook = writer.book
+            workbook.set_size(1800, 1200)
             worksheet = writer.sheets[shipto_alias]
+            worksheet.set_landscape()
+            worksheet.hide_gridlines(1)
+            worksheet.fit_to_pages(1, 0)
 
             # Specify column widths
-            worksheet.set_column('A:A', 28)
-            worksheet.set_column('D:D', 12)
-            worksheet.set_column('H:H', 19)
-            worksheet.set_column('I:I', 12)
-            worksheet.set_column('L:L', 50)
+            worksheet.set_column('C:C', 12)
+            worksheet.set_column('D:D', 20)
+            worksheet.set_column('E:E', 50)
+            worksheet.set_column('H:H', 13)
+            worksheet.set_column('K:K', 12)
+            worksheet.set_column('L:L', 11)
 
             # Specify price column format
             price_format = workbook.add_format()
@@ -167,9 +200,9 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
             worksheet.set_column('N:N', 11, price_format)
 
             # Set logo on each tab
-            worksheet.set_row(0, 43)
+            worksheet.set_row(0, 45)
             worksheet.insert_image(
-                0, 0, os.path.join(os.getcwd(), 'logos', 'PSSI Horz Logo.png'))
+                0, 0, os.path.join(os.getcwd(), 'logos', 'PSSIHorzLogo.png'))
 
             # Add title to worksheet tab
             merge_format = workbook.add_format({
@@ -188,10 +221,10 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
             total_price_format.set_num_format(0x08)
 
             # add Total Price Excel "sum" function to header
-            worksheet.merge_range('F1:J1', 'Quote', merge_format)
-            worksheet.write('M1', 'Total Price', total_price_format)
+            worksheet.merge_range('E1:I1', 'Quote', merge_format)
+            worksheet.write('K1', 'Total Price', total_price_format)
             worksheet.write_formula(
-                'N1', f'=sum(N3:N{2+len(orders_by_shipto.index)})',
+                'L1', f'=sum(L3:L{2+len(orders_by_shipto.index)})',
                 total_price_format)
 
 
