@@ -3,12 +3,16 @@
 import json
 import os
 from argparse import Namespace
+from typing import Any, Dict
 
 import pandas as pd
 from gooey import Gooey, GooeyParser
 
-INPUT_COUNT_FILE = ''
-INPUT_BACKORDER_FILE = ''
+# Create JSON type for type hints
+JsonType = Dict[str, Any]
+
+INPUT_COUNT_FILE = 'counts.xlsx'
+INPUT_BACKORDER_FILE = 'backorders.xlsx'
 OUTPUT_QUOTE_FILE = 'quote'
 OUTPUT_OEUPLOAD_FILE = 'oe_upload'
 OUTPUT_PATH = os.path.expanduser('~/Desktop')
@@ -23,31 +27,31 @@ def get_args() -> Namespace:
     parser.add_argument(
         'count_file',
         default=INPUT_COUNT_FILE,
-        widget="FileChooser",
+        widget='FileChooser',
         help='Provide a path to a count file to import')
     parser.add_argument(
         'backorder_file',
         default=INPUT_BACKORDER_FILE,
-        widget="FileChooser",
+        widget='FileChooser',
         help='Provide a path to a backorder file to import')
     parser.add_argument(
         '--config',
         dest='config_file',
         default=CONFIG_FILE,
-        widget="FileChooser",
+        widget='FileChooser',
         help='Provide a config file in JSON format; see example')
     parser.add_argument(
         '--product_data',
         dest='product_data_file',
         default=DATA_FILE,
-        widget="FileChooser",
+        widget='FileChooser',
         help='Provide a product data file in CSV format; see example')
     parser.add_argument(
         '--quote',
         '-Q',
         dest='quote_name',
         default=OUTPUT_QUOTE_FILE,
-        help='Provide a filename for output of Excel quotation file')
+        help='Provide a filename prefix for output of Excel quotation file(s)')
     parser.add_argument(
         '--OEUpload',
         '-O',
@@ -59,22 +63,48 @@ def get_args() -> Namespace:
         '-P',
         dest='output_path',
         default=OUTPUT_PATH,
-        widget="DirChooser",
+        widget='DirChooser',
         help='Provide a path for the ouput files')
 
     return parser.parse_args()
 
 
-def read_config_file(config_file_path: str):
+def read_config_file(config_file_path: str) -> JsonType:
     try:
         with open(config_file_path) as f:
             config = json.load(f)
             return config
     except FileNotFoundError:
-        return None
+        print(
+            'You do not have a config file at the location selected',
+            'Creating a sample config file for you...',
+            'Open it with a text editor and modify the values',
+            sep='\n\n')
+
+        config_file_template = {
+            'customerNo': '',
+            'warehouse': '',
+            'shipVia': '',
+            'shiptos': {
+                'shipto_alias_1': 'shipto_1',
+                'shipto_alias_2': 'shipto_2'
+            },
+            'PO': {
+                'shipto_1': '0000000',
+                'shipto_2': '1111111',
+            }
+        }
+
+        with open(config_file_path, 'w') as f:
+            json.dump(config_file_template, f, indent=2)
+            return config_file_template
+
     except json.decoder.JSONDecodeError:
-        print("Error in config file; please correct and re-run")
-        return None
+        print(
+            'Error in config file, please correct and re-run; see exact'
+            ' cause below',
+            end='\n\n')
+        raise
 
 
 def make_output_dir(path: str) -> None:
@@ -85,15 +115,28 @@ def make_output_dir(path: str) -> None:
 
 
 def process_counts(count_file: str, backorder_file: str,
-                   product_data_file: str, config) -> pd.DataFrame:
+                   product_data_file: str, config: JsonType) -> pd.DataFrame:
 
-    # TODO: figure out why the script is duplicating rows in some cases
-    # TODO: add try / except and include CSV as an option; include handling for
-    # poorly formed data and incorrect headers
-    # Read in count file to dataframe, format and add "ship_alias" column
-    input_count = pd.read_excel(
-        count_file,
-        names=['barcode', 'count', 'new_prod', 'additional_qty', 'comments'])
+    # Read in count file to dataframe (default is xlsx, but accepts csv too),
+    # format, and add "ship_alias" column
+    try:
+        input_count = pd.read_excel(
+            count_file,
+            names=[
+                'barcode', 'count', 'new_prod', 'additional_qty', 'comments'
+            ])
+    except FileNotFoundError:
+        pass
+
+    try:
+        input_count = pd.read_csv(
+            count_file.replace('xlsx', 'csv'),
+            names=[
+                'barcode', 'count', 'new_prod', 'additional_qty', 'comments'],
+            header=0
+        )
+    except FileNotFoundError:
+        print('No count file found. Try again with count file.', end='\n\n')
 
     input_count['bin'], input_count['shipto'], input_count[
         'prod'] = input_count['barcode'].str.split('-', 2).str
@@ -102,18 +145,20 @@ def process_counts(count_file: str, backorder_file: str,
 
     input_count['shipto_alias'] = input_count['shipto']
 
-    if config:
-        input_count.replace(
-            to_replace={'shipto': config['shiptos']}, value=None, inplace=True)
+    input_count.replace(
+        to_replace={'shipto': config.get('shiptos')}, value=None, inplace=True)
 
-    # TODO: add try / except and include CSV as an option
-    # TODO: modify to accept daily backorder file
     # Read in backorder file to dataframe, merge with counts dataframe, fill
     # NAs, and add "order_amt" column
+    # TODO: add try / except and include CSV as an option
+    # TODO: modify to accept daily backorder file
     input_backorder = pd.read_excel(
-        backorder_file, usecols='A,E,K', names=['prod', 'backorder', 'shipto'])
-    input_backorder = input_backorder.groupby(['prod',
-                                               'shipto']).sum().reset_index()
+        backorder_file,
+        usecols='A,H,I,K',
+        names=['prod', 'backorder', 'enter_date', 'shipto'])
+    input_backorder.drop_duplicates(inplace=True)
+    input_backorder = input_backorder.groupby(
+        ['prod', 'shipto'])['backorder'].sum().reset_index()
 
     orders = input_count.merge(
         input_backorder, on=['prod', 'shipto'], how='left')
@@ -124,9 +169,9 @@ def process_counts(count_file: str, backorder_file: str,
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
-    # TODO: add try / except and include Excel as an option
     # Read product data file, merge with orders dataframe, format price
     # field and add "total_price" field
+    # TODO: add try / except and include Excel as an option
     product_data = pd.read_csv(
         product_data_file, names=['prod', 'description', 'price'])
 
@@ -149,8 +194,7 @@ def process_counts(count_file: str, backorder_file: str,
     return orders_with_descr
 
 
-def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
-                         config) -> None:
+def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
     for shipto_alias in orders.shipto_alias.unique():
         with pd.ExcelWriter(
                 f'{quote_file_path}-{shipto_alias}.xlsx',
@@ -188,7 +232,7 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
             # Specify column widths
             worksheet.set_column('C:C', 12)
             worksheet.set_column('D:D', 20)
-            worksheet.set_column('E:E', 50)
+            worksheet.set_column('E:E', 48)
             worksheet.set_column('H:H', 13)
             worksheet.set_column('K:K', 12)
             worksheet.set_column('L:L', 11)
@@ -228,7 +272,8 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str,
                 total_price_format)
 
 
-def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
+def write_oe_template(orders: pd.DataFrame, oe_file_path: str,
+                      config: JsonType) -> None:
     with pd.ExcelWriter(f'{oe_file_path}.xlsx', engine='xlsxwriter') as writer:
         for shipto in orders.shipto.unique():
 
@@ -255,7 +300,7 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
             worksheet = writer.sheets[shipto]
             worksheet.write('A1', config.get('customerNo'))
             worksheet.write('A2', config.get('warehouse'))
-            worksheet.write('A3', config.get('PO')[shipto])
+            worksheet.write('A3', config.get('PO', {}).get(shipto))
             worksheet.write('A4', config.get('shipVia'))
             worksheet.write('B1', shipto)
             worksheet.write('B2', 'QU')
@@ -275,7 +320,7 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str, config) -> None:
             worksheet.set_column('O:O', 15)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 
     # Get args and configs
     args = get_args()
@@ -292,4 +337,4 @@ if __name__ == "__main__":
 
     # Write out quote files (one file for each shipto)
     quote_file_path = os.path.join(args.output_path, args.quote_name)
-    write_quote_template(orders, quote_file_path, config)
+    write_quote_template(orders, quote_file_path)
