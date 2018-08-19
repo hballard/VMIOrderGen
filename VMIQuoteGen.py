@@ -8,9 +8,6 @@ from typing import Any, Dict
 import pandas as pd
 from gooey import Gooey, GooeyParser
 
-# Create JSON type for type hints
-JsonType = Dict[str, Any]
-
 INPUT_COUNT_FILE = ''
 INPUT_BACKORDER_FILE = ''
 OUTPUT_QUOTE_FILE = 'quote'
@@ -19,11 +16,14 @@ OUTPUT_PATH = os.path.expanduser('~/Desktop')
 CONFIG_FILE = 'config.json'
 DATA_FILE = 'product_data.csv'
 
+# Create JSON type alias for type hinting config file
+JsonType = Dict[str, Any]
+
 
 @Gooey(program_name='VMI Quote Generator', default_size=(810, 600))
 def get_args() -> Namespace:
-    parser = GooeyParser(description='Process VMI counts and'
-                         ' return quote and OE Upload files')
+    parser = GooeyParser(description='Process VMI counts and '
+                         'return quote and OE Upload files')
     parser.add_argument(
         'count_file',
         default=INPUT_COUNT_FILE,
@@ -45,7 +45,7 @@ def get_args() -> Namespace:
         dest='product_data_file',
         default=DATA_FILE,
         widget='FileChooser',
-        help='Provide a product data file in CSV format; see example')
+        help='Provide a product data file in CSV or Excel format; see example')
     parser.add_argument(
         '--quote',
         '-Q',
@@ -64,7 +64,7 @@ def get_args() -> Namespace:
         dest='output_path',
         default=OUTPUT_PATH,
         widget='DirChooser',
-        help='Provide a path for the ouput files')
+        help='Provide a folder path for the ouput files')
 
     return parser.parse_args()
 
@@ -79,7 +79,8 @@ def read_config_file(config_file_path: str) -> JsonType:
             'You do not have a config file at the location selected',
             'Creating a sample config file for you...',
             'Open it with a text editor and modify the values',
-            sep='\n\n', end='\n\n')
+            sep='\n\n',
+            end='\n\n')
 
         config_file_template = {
             'customerNo': '',
@@ -100,8 +101,8 @@ def read_config_file(config_file_path: str) -> JsonType:
             return config_file_template
     except json.decoder.JSONDecodeError:
         print(
-            'Error in config file, please correct and re-run; see exact'
-            ' cause below',
+            'Error in config file, please correct and re-run; see exact '
+            'cause below',
             end='\n\n')
         raise
 
@@ -131,7 +132,8 @@ def process_counts(count_file: str, backorder_file: str,
                 header=0)
         except FileNotFoundError:
             print(
-                'No count file found. Try again with count file.', end='\n\n')
+                'No count file found. Try again with a count file.',
+                end='\n\n')
 
     input_count['bin'], input_count['shipto'], input_count[
         'prod'] = input_count['barcode'].str.split('-', 2).str
@@ -143,9 +145,9 @@ def process_counts(count_file: str, backorder_file: str,
     input_count.replace(
         to_replace={'shipto': config.get('shiptos')}, value=None, inplace=True)
 
-    # Read in backorder file to dataframe, merge with counts dataframe, fill
-    # NAs, and add "order_amt" column
-    # TODO: modify to accept daily backorder file
+    # Read in backorder file to dataframe (default is xlsx, but accepts csv
+    # too), merge with counts dataframe, fill NAs, and add "order_amt" column
+    # TODO: modify to accept daily emailed backorder file
     backorder_column_names = ['prod', 'backorder', 'enter_date', 'shipto']
     try:
         input_backorder = pd.read_excel(
@@ -170,14 +172,13 @@ def process_counts(count_file: str, backorder_file: str,
         input_backorder, on=['prod', 'shipto'], how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
-        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder']
-                   else 0),
+        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder'] else 0),
         axis=1)
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
-    # Read product data file, merge with orders dataframe, format price
-    # field and add "total_price" field
+    # Read product data file (default is csv, but accepts xlsx too), merge
+    # with orders dataframe, format price field and add "total_price" field
     product_column_names = ['prod', 'description', 'price']
     try:
         product_data = pd.read_csv(
@@ -192,7 +193,8 @@ def process_counts(count_file: str, backorder_file: str,
                 'You do not have a product data file at the location selected',
                 'Creating a sample product data file for you...',
                 'Open it with a text editor and modify the values',
-                sep='\n\n', end='\n\n')
+                sep='\n\n',
+                end='\n\n')
             product_data = pd.DataFrame(columns=product_column_names)
             product_data.to_csv(product_data_file, index=False)
 
