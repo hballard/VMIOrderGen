@@ -98,7 +98,6 @@ def read_config_file(config_file_path: str) -> JsonType:
         with open(config_file_path, 'w') as f:
             json.dump(config_file_template, f, indent=2)
             return config_file_template
-
     except json.decoder.JSONDecodeError:
         print(
             'Error in config file, please correct and re-run; see exact'
@@ -171,14 +170,14 @@ def process_counts(count_file: str, backorder_file: str,
         input_backorder, on=['prod', 'shipto'], how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
-        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder'] else 0),
+        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder']
+                   else 0),
         axis=1)
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
     # Read product data file, merge with orders dataframe, format price
     # field and add "total_price" field
-    # TODO: add try / except and include Excel as an option
     product_column_names = ['prod', 'description', 'price']
     try:
         product_data = pd.read_csv(
