@@ -79,7 +79,7 @@ def read_config_file(config_file_path: str) -> JsonType:
             'You do not have a config file at the location selected',
             'Creating a sample config file for you...',
             'Open it with a text editor and modify the values',
-            sep='\n\n')
+            sep='\n\n', end='\n\n')
 
         config_file_template = {
             'customerNo': '',
@@ -179,8 +179,23 @@ def process_counts(count_file: str, backorder_file: str,
     # Read product data file, merge with orders dataframe, format price
     # field and add "total_price" field
     # TODO: add try / except and include Excel as an option
-    product_data = pd.read_csv(
-        product_data_file, names=['prod', 'description', 'price'])
+    product_column_names = ['prod', 'description', 'price']
+    try:
+        product_data = pd.read_csv(
+            product_data_file, names=product_column_names, header=0)
+    except FileNotFoundError:
+        try:
+            product_data = pd.read_excel(
+                product_data_file.replace('csv', 'xlsx'),
+                names=product_column_names)
+        except FileNotFoundError:
+            print(
+                'You do not have a product data file at the location selected',
+                'Creating a sample product data file for you...',
+                'Open it with a text editor and modify the values',
+                sep='\n\n', end='\n\n')
+            product_data = pd.DataFrame(columns=product_column_names)
+            product_data.to_csv(product_data_file, index=False)
 
     orders_with_descr = orders.merge(product_data, on=['prod'], how='left')
 
