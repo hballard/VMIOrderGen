@@ -11,8 +11,8 @@ from gooey import Gooey, GooeyParser
 # Create JSON type for type hints
 JsonType = Dict[str, Any]
 
-INPUT_COUNT_FILE = 'counts.xlsx'
-INPUT_BACKORDER_FILE = 'backorders.xlsx'
+INPUT_COUNT_FILE = ''
+INPUT_BACKORDER_FILE = ''
 OUTPUT_QUOTE_FILE = 'quote'
 OUTPUT_OEUPLOAD_FILE = 'oe_upload'
 OUTPUT_PATH = os.path.expanduser('~/Desktop')
@@ -28,12 +28,12 @@ def get_args() -> Namespace:
         'count_file',
         default=INPUT_COUNT_FILE,
         widget='FileChooser',
-        help='Provide a path to a count file to import')
+        help='Provide a path to a count file to import (Excel or CSV)')
     parser.add_argument(
         'backorder_file',
         default=INPUT_BACKORDER_FILE,
         widget='FileChooser',
-        help='Provide a path to a backorder file to import')
+        help='Provide a path to a backorder file to import (Excel or CSV)')
     parser.add_argument(
         '--config',
         dest='config_file',
