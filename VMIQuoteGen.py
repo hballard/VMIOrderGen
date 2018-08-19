@@ -119,24 +119,20 @@ def process_counts(count_file: str, backorder_file: str,
 
     # Read in count file to dataframe (default is xlsx, but accepts csv too),
     # format, and add "ship_alias" column
+    count_column_names = [
+        'barcode', 'count', 'new_prod', 'additional_qty', 'comments'
+    ]
     try:
-        input_count = pd.read_excel(
-            count_file,
-            names=[
-                'barcode', 'count', 'new_prod', 'additional_qty', 'comments'
-            ])
+        input_count = pd.read_excel(count_file, names=count_column_names)
     except FileNotFoundError:
-        pass
-
-    try:
-        input_count = pd.read_csv(
-            count_file.replace('xlsx', 'csv'),
-            names=[
-                'barcode', 'count', 'new_prod', 'additional_qty', 'comments'],
-            header=0
-        )
-    except FileNotFoundError:
-        print('No count file found. Try again with count file.', end='\n\n')
+        try:
+            input_count = pd.read_csv(
+                count_file.replace('xlsx', 'csv'),
+                names=count_column_names,
+                header=0)
+        except FileNotFoundError:
+            print(
+                'No count file found. Try again with count file.', end='\n\n')
 
     input_count['bin'], input_count['shipto'], input_count[
         'prod'] = input_count['barcode'].str.split('-', 2).str
@@ -150,12 +146,23 @@ def process_counts(count_file: str, backorder_file: str,
 
     # Read in backorder file to dataframe, merge with counts dataframe, fill
     # NAs, and add "order_amt" column
-    # TODO: add try / except and include CSV as an option
     # TODO: modify to accept daily backorder file
-    input_backorder = pd.read_excel(
-        backorder_file,
-        usecols='A,H,I,K',
-        names=['prod', 'backorder', 'enter_date', 'shipto'])
+    backorder_column_names = ['prod', 'backorder', 'enter_date', 'shipto']
+    try:
+        input_backorder = pd.read_excel(
+            backorder_file, usecols='A,H,I,K', names=backorder_column_names)
+    except FileNotFoundError:
+        try:
+            input_backorder = pd.read_csv(
+                backorder_file.replace('xlsx', 'csv'),
+                usecols=[0, 7, 8, 10],
+                names=backorder_column_names,
+                header=0)
+        except FileNotFoundError:
+            print(
+                'No backorder file found. Try again with backorder file.',
+                end='\n\n')
+
     input_backorder.drop_duplicates(inplace=True)
     input_backorder = input_backorder.groupby(
         ['prod', 'shipto'])['backorder'].sum().reset_index()
