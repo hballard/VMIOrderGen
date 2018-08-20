@@ -23,7 +23,7 @@ JsonType = Dict[str, Any]
 @Gooey(program_name='VMI Quote Generator', default_size=(810, 600))
 def get_args() -> Namespace:
     parser = GooeyParser(description='Process VMI counts and '
-                         'return quote and OE Upload files')
+                         'create quote and OE Upload files')
     parser.add_argument(
         'count_file',
         default=INPUT_COUNT_FILE,
@@ -172,8 +172,8 @@ def process_counts(count_file: str, backorder_file: str,
         input_backorder, on=['prod', 'shipto'], how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
-        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder'] else 0),
-        axis=1)
+        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder']
+                   else 0), axis=1)
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
