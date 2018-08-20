@@ -8,13 +8,18 @@ from typing import Any, Dict
 import pandas as pd
 from gooey import Gooey, GooeyParser
 
+CONFIG_FOLDER = 'config'
+CONFIG_FILE = 'config.json'
+DATA_FOLDER = 'data'
+DATA_FILE = 'product_data.csv'
+IMAGE_FOLDER = 'images'
+QUOTE_LOGO_FILE = 'company_logo.png'
 INPUT_COUNT_FILE = ''
 INPUT_BACKORDER_FILE = ''
 OUTPUT_QUOTE_FILE = 'quote'
 OUTPUT_OEUPLOAD_FILE = 'oe_upload'
-OUTPUT_PATH = os.path.expanduser('~/Desktop')
-CONFIG_FILE = 'config.json'
-DATA_FILE = 'product_data.csv'
+OUTPUT_PATH = os.path.join(os.path.expanduser('~'), 'Desktop')
+BASE_PATH = ''
 
 # Create JSON type alias for type hinting config file
 JsonType = Dict[str, Any]
@@ -37,13 +42,13 @@ def get_args() -> Namespace:
     parser.add_argument(
         '--config',
         dest='config_file',
-        default=CONFIG_FILE,
+        default=os.path.join(BASE_PATH, CONFIG_FOLDER, CONFIG_FILE),
         widget='FileChooser',
         help='Provide a config file in JSON format; see example')
     parser.add_argument(
         '--product_data',
         dest='product_data_file',
-        default=DATA_FILE,
+        default=os.path.join(BASE_PATH, DATA_FOLDER, DATA_FILE),
         widget='FileChooser',
         help='Provide a product data file in CSV or Excel format; see example')
     parser.add_argument(
@@ -96,6 +101,7 @@ def read_config_file(config_file_path: str) -> JsonType:
             }
         }
 
+        os.makedirs(os.path.dirname(config_file_path), exist_ok=True)
         with open(config_file_path, 'w') as f:
             json.dump(config_file_template, f, indent=2)
             return config_file_template
@@ -196,6 +202,7 @@ def process_counts(count_file: str, backorder_file: str,
                 sep='\n\n',
                 end='\n\n')
             product_data = pd.DataFrame(columns=product_column_names)
+            os.makedirs(os.path.dirname(product_data_file), exist_ok=True)
             product_data.to_csv(product_data_file, index=False)
 
     orders_with_descr = orders.merge(product_data, on=['prod'], how='left')
@@ -269,7 +276,7 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
             # Set logo on each tab
             worksheet.set_row(0, 45)
             worksheet.insert_image(
-                0, 0, os.path.join(os.getcwd(), 'logos', 'PSSIHorzLogo.png'))
+                0, 0, os.path.join(BASE_PATH, IMAGE_FOLDER, QUOTE_LOGO_FILE))
 
             # Add title to worksheet tab
             merge_format = workbook.add_format({
