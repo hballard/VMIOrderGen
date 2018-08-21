@@ -178,8 +178,8 @@ def process_counts(count_file: str, backorder_file: str,
         input_backorder, on=['prod', 'shipto'], how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
-        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder']
-                   else 0), axis=1)
+        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder'] else 0),
+        axis=1)
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
@@ -225,6 +225,14 @@ def process_counts(count_file: str, backorder_file: str,
 
 
 def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
+    image_path = os.path.join(BASE_PATH, IMAGE_FOLDER, QUOTE_LOGO_FILE)
+    if not os.path.exists(image_path):
+        print(
+            'You are missing a "company_logo.png" file in the "images"'
+            ' folder; your quotes will not have an image in the'
+            ' header unless you provide one',
+            end='\n\n')
+
     for shipto_alias in orders.shipto_alias.unique():
         with pd.ExcelWriter(
                 f'{quote_file_path}-{shipto_alias}.xlsx',
@@ -275,8 +283,10 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
 
             # Set logo on each tab
             worksheet.set_row(0, 45)
-            worksheet.insert_image(
-                0, 0, os.path.join(BASE_PATH, IMAGE_FOLDER, QUOTE_LOGO_FILE))
+            # TODO: also add optional command arguement to allow user to
+            # overide
+            if os.path.exists(image_path):
+                worksheet.insert_image(0, 0, image_path)
 
             # Add title to worksheet tab
             merge_format = workbook.add_format({
