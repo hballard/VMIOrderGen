@@ -178,7 +178,8 @@ def process_counts(count_file: str, backorder_file: str,
         input_backorder, on=['prod', 'shipto'], how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
-        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder'] else 0),
+        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder']
+                   else 0),
         axis=1)
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
