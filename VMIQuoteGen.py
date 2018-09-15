@@ -174,8 +174,11 @@ def process_counts(count_file: str, backorder_file: str,
     input_backorder = input_backorder.groupby(
         ['prod', 'shipto'])['backorder'].sum().reset_index()
 
-    orders = input_count.merge(
-        input_backorder, on=['prod', 'shipto'], how='left')
+    orders = pd.merge(
+        input_count.assign(shipto=input_count['shipto'].astype(str)),
+        input_backorder.assign(shipto=input_backorder['shipto'].astype(str)),
+        on=['prod', 'shipto'],
+        how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
         lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder']
@@ -315,6 +318,9 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
 
 def write_oe_template(orders: pd.DataFrame, oe_file_path: str,
                       config: JsonType) -> None:
+
+    # TODO: add toggle for user to choose to write prices
+    # from price file to upload file
     with pd.ExcelWriter(f'{oe_file_path}.xlsx', engine='xlsxwriter') as writer:
         for shipto in orders.shipto.unique():
 
