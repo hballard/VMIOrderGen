@@ -144,7 +144,7 @@ def process_counts(count_file: str, backorder_file: str,
     input_count['bin'], input_count['shipto'], input_count[
         'prod'] = input_count['barcode'].str.split('-', 2).str
 
-    input_count['prod'] = input_count['prod'].str.rstrip()
+    input_count['prod'] = input_count['prod'].str.rstrip().str.upper()
 
     input_count['shipto_alias'] = input_count['shipto']
 
@@ -171,6 +171,7 @@ def process_counts(count_file: str, backorder_file: str,
                 end='\n\n')
 
     input_backorder.drop_duplicates(inplace=True)
+    input_backorder['prod'] = input_backorder['prod'].str.upper()
     input_backorder = input_backorder.groupby(
         ['prod', 'shipto'])['backorder'].sum().reset_index()
 
