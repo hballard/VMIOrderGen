@@ -155,22 +155,30 @@ def process_counts(count_file: str, backorder_file: str,
     # Read in backorder file to dataframe (default is xlsx, but accepts csv
     # too), merge with counts dataframe, fill NAs, and add "order_amt" column
     # TODO: modify to accept daily emailed backorder file
-    backorder_column_names = ['prod', 'backorder', 'enter_date', 'shipto']
+    backorder_column_names = [
+        'enter_date', 'prod', 'backorder', 'custno', 'shipto'
+    ]
     try:
         input_backorder = pd.read_excel(
-            backorder_file, usecols='A,H,I,K', names=backorder_column_names)
+            backorder_file,
+            usecols='E,G,X,AB,AE',
+            names=backorder_column_names,
+            skip_rows=[0])
     except FileNotFoundError:
         try:
             input_backorder = pd.read_csv(
                 backorder_file.replace('xlsx', 'csv'),
-                usecols=[0, 7, 8, 10],
+                usecols=[5, 7, 24, 28, 31],
                 names=backorder_column_names,
-                header=0)
+                header=1,
+                skip_rows=[0])
         except FileNotFoundError:
             print(
                 'No backorder file found. Try again with backorder file.',
                 end='\n\n')
 
+    input_backorder = input_backorder[input_backorder.custno.astype(str) ==
+                                      config.get('customerNo')]
     input_backorder.drop_duplicates(inplace=True)
     input_backorder['prod'] = input_backorder['prod'].str.upper()
     input_backorder = input_backorder.groupby(
