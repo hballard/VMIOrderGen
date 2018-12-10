@@ -6,6 +6,7 @@ from argparse import Namespace
 from typing import Any, Dict
 
 import pandas as pd
+import numpy as np
 from gooey import Gooey, GooeyParser
 
 CONFIG_FOLDER = 'config'
@@ -182,15 +183,14 @@ def process_counts(count_file: str, backorder_file: str,
         how='left')
     orders.fillna(0, inplace=True)
     orders['order_amt'] = orders.apply(
-        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder']
-                   else 0),
+        lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder'] else 0),
         axis=1)
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
     # Read product data file (default is csv, but accepts xlsx too), merge
     # with orders dataframe, format price field and add "total_price" field
-    product_column_names = ['prod', 'description', 'price']
+    product_column_names = ['prod', 'description', 'price', 'alt_prod']
     try:
         product_data = pd.read_csv(
             product_data_file, names=product_column_names, header=0)
@@ -211,6 +211,10 @@ def process_counts(count_file: str, backorder_file: str,
             product_data.to_csv(product_data_file, index=False)
 
     orders_with_descr = orders.merge(product_data, on=['prod'], how='left')
+
+    orders_with_descr['prod'] = np.where(orders_with_descr['alt_prod'].isna(),
+                                         orders_with_descr['prod'],
+                                         orders_with_descr['alt_prod'])
 
     orders_with_descr['price'] = orders_with_descr['price'].replace(
         '[\$,]', '', regex=True).astype(float)
