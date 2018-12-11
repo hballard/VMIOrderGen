@@ -152,6 +152,34 @@ def process_counts(count_file: str, backorder_file: str,
     input_count.replace(
         to_replace={'shipto': config.get('shiptos')}, value=None, inplace=True)
 
+    # Read product data file (default is csv, but accepts xlsx too), merge
+    # with orders dataframe, format price field and add "total_price" field
+    product_column_names = ['prod', 'description', 'price', 'alt_prod']
+    try:
+        product_data = pd.read_csv(
+            product_data_file, names=product_column_names, header=0)
+    except FileNotFoundError:
+        try:
+            product_data = pd.read_excel(
+                product_data_file.replace('csv', 'xlsx'),
+                names=product_column_names)
+        except FileNotFoundError:
+            print(
+                'You do not have a product data file at the location selected',
+                'Creating a sample product data file for you...',
+                'Open it with a text editor and modify the values',
+                sep='\n\n',
+                end='\n\n')
+            product_data = pd.DataFrame(columns=product_column_names)
+            os.makedirs(os.path.dirname(product_data_file), exist_ok=True)
+            product_data.to_csv(product_data_file, index=False)
+
+    input_count = input_count.merge(product_data, on=['prod'], how='left')
+
+    input_count['prod'] = np.where(input_count['alt_prod'].isna(),
+                                   input_count['prod'],
+                                   input_count['alt_prod'])
+
     # Read in backorder file to dataframe (default is xlsx, but accepts csv
     # too), merge with counts dataframe, fill NAs, and add "order_amt" column
     # TODO: modify to accept daily emailed backorder file
@@ -196,39 +224,9 @@ def process_counts(count_file: str, backorder_file: str,
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
-    # Read product data file (default is csv, but accepts xlsx too), merge
-    # with orders dataframe, format price field and add "total_price" field
-    product_column_names = ['prod', 'description', 'price', 'alt_prod']
-    try:
-        product_data = pd.read_csv(
-            product_data_file, names=product_column_names, header=0)
-    except FileNotFoundError:
-        try:
-            product_data = pd.read_excel(
-                product_data_file.replace('csv', 'xlsx'),
-                names=product_column_names)
-        except FileNotFoundError:
-            print(
-                'You do not have a product data file at the location selected',
-                'Creating a sample product data file for you...',
-                'Open it with a text editor and modify the values',
-                sep='\n\n',
-                end='\n\n')
-            product_data = pd.DataFrame(columns=product_column_names)
-            os.makedirs(os.path.dirname(product_data_file), exist_ok=True)
-            product_data.to_csv(product_data_file, index=False)
+    orders['price'] = orders['price'].replace('[\$,]', '', regex=True).astype(float)
 
-    orders_with_descr = orders.merge(product_data, on=['prod'], how='left')
-
-    orders_with_descr['prod'] = np.where(orders_with_descr['alt_prod'].isna(),
-                                         orders_with_descr['prod'],
-                                         orders_with_descr['alt_prod'])
-
-    orders_with_descr['price'] = orders_with_descr['price'].replace(
-        '[\$,]', '', regex=True).astype(float)
-
-    orders_with_descr['total_price'] = (
-        orders_with_descr['price'] * orders_with_descr['order_amt'])
+    orders['total_price'] = (orders['price'] * orders['order_amt'])
 
     # Re-arrange column order
     new_column_order = [
@@ -236,9 +234,9 @@ def process_counts(count_file: str, backorder_file: str,
         'shipto', 'shipto_alias', 'prod', 'description', 'backorder',
         'order_amt', 'price', 'total_price'
     ]
-    orders_with_descr = orders_with_descr[new_column_order]
+    orders = orders[new_column_order]
 
-    return orders_with_descr
+    return orders
 
 
 def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
