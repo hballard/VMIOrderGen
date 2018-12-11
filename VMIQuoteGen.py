@@ -153,7 +153,7 @@ def process_counts(count_file: str, backorder_file: str,
         to_replace={'shipto': config.get('shiptos')}, value=None, inplace=True)
 
     # Read product data file (default is csv, but accepts xlsx too), merge
-    # with orders dataframe, format price field and add "total_price" field
+    # with input_count dataframe
     product_column_names = ['prod', 'description', 'price', 'alt_prod']
     try:
         product_data = pd.read_csv(
@@ -182,7 +182,6 @@ def process_counts(count_file: str, backorder_file: str,
 
     # Read in backorder file to dataframe (default is xlsx, but accepts csv
     # too), merge with counts dataframe, fill NAs, and add "order_amt" column
-    # TODO: modify to accept daily emailed backorder file
     backorder_column_names = [
         'enter_date', 'prod', 'backorder', 'custno', 'shipto'
     ]
@@ -207,8 +206,11 @@ def process_counts(count_file: str, backorder_file: str,
 
     input_backorder = input_backorder[input_backorder.custno.astype(str) ==
                                       config.get('customerNo')]
+
     input_backorder.drop_duplicates(inplace=True)
+
     input_backorder['prod'] = input_backorder['prod'].str.upper()
+
     input_backorder = input_backorder.groupby(
         ['prod', 'shipto'])['backorder'].sum().reset_index()
 
@@ -217,7 +219,9 @@ def process_counts(count_file: str, backorder_file: str,
         input_backorder.assign(shipto=input_backorder['shipto'].astype(str)),
         on=['prod', 'shipto'],
         how='left')
+
     orders.fillna(0, inplace=True)
+
     orders['order_amt'] = orders.apply(
         lambda x: (x['count'] - x['backorder'] if x['count'] >= x['backorder'] else 0),
         axis=1)
