@@ -53,6 +53,20 @@ def get_args() -> Namespace:
         widget='FileChooser',
         help='Provide a product data file in CSV or Excel format; see example')
     parser.add_argument(
+        '--path',
+        '-P',
+        dest='output_path',
+        default=OUTPUT_PATH,
+        widget='DirChooser',
+        help='Provide a folder path for the ouput files')
+    parser.add_argument(
+        '--add_prices',
+        '-A',
+        dest='add_prices',
+        action='store_true',
+        widget='CheckBox',
+        help='Toggle if you want to add prices to upload file')
+    parser.add_argument(
         '--quote',
         '-Q',
         dest='quote_name',
@@ -64,13 +78,6 @@ def get_args() -> Namespace:
         dest='OEUpload_name',
         default=OUTPUT_OEUPLOAD_FILE,
         help='Provide a filename for output of Excel OE upload template file')
-    parser.add_argument(
-        '--path',
-        '-P',
-        dest='output_path',
-        default=OUTPUT_PATH,
-        widget='DirChooser',
-        help='Provide a folder path for the ouput files')
 
     return parser.parse_args()
 
@@ -228,7 +235,8 @@ def process_counts(count_file: str, backorder_file: str,
 
     orders['order_amt'] = orders['order_amt'] + orders['additional_qty']
 
-    orders['price'] = orders['price'].replace('[\$,]', '', regex=True).astype(float)
+    orders['price'] = orders['price'].replace(
+        '[\$,]', '', regex=True).astype(float)
 
     orders['total_price'] = (orders['price'] * orders['order_amt'])
 
@@ -332,10 +340,8 @@ def write_quote_template(orders: pd.DataFrame, quote_file_path: str) -> None:
 
 
 def write_oe_template(orders: pd.DataFrame, oe_file_path: str,
-                      config: JsonType) -> None:
+                      add_prices: bool, config: JsonType) -> None:
 
-    # TODO: add toggle for user to choose to write prices
-    # from price file to upload file
     with pd.ExcelWriter(f'{oe_file_path}.xlsx', engine='xlsxwriter') as writer:
         for shipto in orders.shipto.unique():
 
@@ -357,6 +363,15 @@ def write_oe_template(orders: pd.DataFrame, oe_file_path: str,
                 index=False,
                 startrow=8,
                 startcol=2)
+            if add_prices:
+                orders_by_shipto.to_excel(
+                    writer,
+                    sheet_name=f'{shipto}',
+                    columns=['price'],
+                    header=False,
+                    index=False,
+                    startrow=8,
+                    startcol=4)
 
             # write oe upload template headers
             worksheet = writer.sheets[shipto]
@@ -395,7 +410,7 @@ if __name__ == '__main__':
     # Write out OE upload template file (one tab for each shipto)
     make_output_dir(args.output_path)
     oe_file_path = os.path.join(args.output_path, args.OEUpload_name)
-    write_oe_template(orders, oe_file_path, config)
+    write_oe_template(orders, oe_file_path, args.add_prices, config)
 
     # Write out quote files (one file for each shipto)
     quote_file_path = os.path.join(args.output_path, args.quote_name)
