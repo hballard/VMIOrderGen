@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+# TODO: make sure all inputs are capitalized and trimmed
+# TODO: handle case wehere count is for an invalid barcode format (crashes
+# right now)
+
 import json
 import os
 from argparse import Namespace
@@ -14,6 +18,7 @@ CONFIG_FILE = 'config.json'
 DATA_FOLDER = 'data'
 DATA_FILE = 'product_data.csv'
 IMAGE_FOLDER = 'images'
+ICON_FOLDER = 'icon'
 QUOTE_LOGO_FILE = 'company_logo.png'
 INPUT_COUNT_FILE = ''
 INPUT_BACKORDER_FILE = ''
@@ -26,7 +31,10 @@ BASE_PATH = ''
 JsonType = Dict[str, Any]
 
 
-@Gooey(program_name='VMI Quote Generator', default_size=(810, 600))
+@Gooey(
+    program_name='VMI Quote Generator',
+    image_dir=os.path.join(BASE_PATH, ICON_FOLDER),
+    default_size=(810, 600))
 def get_args() -> Namespace:
     parser = GooeyParser(description='Process VMI counts and '
                          'create quote and OE Upload files')

@@ -37,10 +37,10 @@ exe = EXE(
     windowed=True,
     upx=True,
     #  console=False,
-    icon=os.path.join('icon', 'VMIQuoteGen.icns'))
+    icon=os.path.join('icon', 'program_icon.icns'))
 
 app = BUNDLE(
     exe,
     name='VMIQuoteGen.app',
     info_plist={'NSHighResolutionCapable': 'True'},
-    icon=os.path.join('icon', 'VMIQuoteGen.icns'))
+    icon=os.path.join('icon', 'program_icon.icns'))
