@@ -203,7 +203,7 @@ def process_counts(count_file: str, backorder_file: str,
     try:
         input_backorder = pd.read_excel(
             backorder_file,
-            usecols='E,G,X,AB,AE',
+            usecols='D,F,W,AB,AD',
             names=backorder_column_names,
             skip_rows=[0])
     except FileNotFoundError:
