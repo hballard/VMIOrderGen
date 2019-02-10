@@ -189,6 +189,10 @@ def process_counts(count_file: str, backorder_file: str,
             os.makedirs(os.path.dirname(product_data_file), exist_ok=True)
             product_data.to_csv(product_data_file, index=False)
 
+    product_data['prod'] = product_data['prod'].str.rstrip().str.upper()
+    product_data['alt_prod'] = product_data['alt_prod'].str.rstrip().str.upper()
+    product_data['description'] = product_data['description'].str.upper()
+
     input_count = input_count.merge(product_data, on=['prod'], how='left')
 
     input_count['prod'] = np.where(input_count['alt_prod'].isna(),
@@ -225,6 +229,7 @@ def process_counts(count_file: str, backorder_file: str,
     input_backorder.drop_duplicates(inplace=True)
 
     input_backorder['prod'] = input_backorder['prod'].str.upper()
+    input_backorder['shipto'] = input_backorder['shipto'].str.upper()
 
     input_backorder = input_backorder.groupby(
         ['prod', 'shipto'])['backorder'].sum().reset_index()
