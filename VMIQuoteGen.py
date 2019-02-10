@@ -210,7 +210,7 @@ def process_counts(count_file: str, backorder_file: str,
         try:
             input_backorder = pd.read_csv(
                 backorder_file.replace('xlsx', 'csv'),
-                usecols=[5, 7, 24, 28, 31],
+                usecols=[4, 6, 23, 27, 29],
                 names=backorder_column_names,
                 header=1,
                 skip_rows=[0])
