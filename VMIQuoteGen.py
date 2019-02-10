@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-# TODO: make sure all inputs are capitalized and trimmed
 # TODO: handle case wehere count is for an invalid barcode format (crashes
 # right now)
 
