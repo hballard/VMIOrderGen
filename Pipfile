@@ -11,9 +11,9 @@ gooey = "*"
 xlrd = "*"
 
 [dev-packages]
-yapf = "*"
 "flake8" = "*"
 mypy = "*"
 pyinstaller = "*"
+black = "*"
 
 [requires]
